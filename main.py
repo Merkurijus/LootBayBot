@@ -87,3 +87,13 @@ def topup_selected(message):
         bot.send_message(message.chat.id, "⚠️ Invalid selection. Please start again with /start")
 
 bot.polling()
+# Uptime feature (optional)
+try:
+    import keep_alive
+    keep_alive.keep_alive()
+except:
+    pass
+
+print("✅ Botas veikia. Laukia žinučių...")  # <- Šita eilutė rodo, kad viskas veikia
+
+bot.polling(none_stop=True)
