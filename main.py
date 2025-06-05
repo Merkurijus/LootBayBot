@@ -40,7 +40,7 @@ def send_welcome(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     for game in GAMES.keys():
         markup.add(game
-        "🎮 Welcome to LootBayBot!\n\n"
+        "🎮 Welcome to LootBayBot!\n\n" 
         "Choose your game below and get your top-up instantly using crypto 💰\n\n"
         "🎁 *Bonus system:*\n"
         "• Orders over 20 USDT – Surprise gift\n"
