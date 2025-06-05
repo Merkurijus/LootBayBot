@@ -39,9 +39,7 @@ GAMES = {
 def send_welcome(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     for game in GAMES.keys():
-        markup.add(game)
-    bot.send_message(
-        message.chat.id,
+        markup.add(game
         "🎮 Welcome to LootBayBot!\n\n"
         "Choose your game below and get your top-up instantly using crypto 💰\n\n"
         "🎁 *Bonus system:*\n"
