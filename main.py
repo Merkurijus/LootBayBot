@@ -1,10 +1,14 @@
 import telebot
 from telebot import types
+import os
 
-API_TOKEN = 'PASTE_YOUR_TOKEN_HERE'
+API_TOKEN = os.getenv("API_TOKEN")
+ADMIN_ID = os.getenv("ADMIN_ID")
+
 bot = telebot.TeleBot(API_TOKEN)
 
 TRC20_ADDRESS = "TGGZH5ZmNckTmuh3ZxLm3NoGUJ3yJifavP"
+
 BONUS_MESSAGE = {
     "tier1": "\n🎁 Bonus: You get a surprise gift for orders over 20 USDT!",
     "tier2": "\n🎁 Bonus: You get a 15 USDT gift for orders over 50 USDT!",
@@ -39,14 +43,19 @@ GAMES = {
 def send_welcome(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     for game in GAMES.keys():
-        markup.add(game
-        "🎮 Welcome to LootBayBot!\n\n" 
-        "Choose your game below and get your top-up instantly using crypto 💰\n\n"
-        "🎁 *Bonus system:*\n"
-        "• Orders over 20 USDT – Surprise gift\n"
-        "• Orders over 50 USDT – 15 USDT gift\n"
-        "• Orders over 100 USDT – 30 USDT gift\n\n"
-        "👇 Select a game:",
+        markup.add(game)
+    bot.send_message(
+        message.chat.id,
+        """🎮 Welcome to LootBayBot!
+
+Choose your game below and get your top-up instantly using crypto 💰
+
+🎁 *Bonus system:*
+• Orders over 20 USDT – Surprise gift
+• Orders over 50 USDT – 15 USDT gift
+• Orders over 100 USDT – 30 USDT gift
+
+👇 Select a game:""",
         reply_markup=markup,
         parse_mode="Markdown"
     )
@@ -84,14 +93,6 @@ def topup_selected(message):
     except Exception:
         bot.send_message(message.chat.id, "⚠️ Invalid selection. Please start again with /start")
 
-bot.polling()
-# Uptime feature (optional)
-try:
-    import keep_alive
-    keep_alive.keep_alive()
-except:
-    pass
-
-print("✅ Botas veikia. Laukia žinučių...")  # <- Šita eilutė rodo, kad viskas veikia
-
+# Start the bot
+print("✅ Botas veikia. Laukia žinučių...")
 bot.polling(none_stop=True)
