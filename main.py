@@ -1,114 +1,146 @@
 import telebot
 from telebot import types
 import os
+import math
 
 API_TOKEN = os.getenv("API_TOKEN")
-ADMIN_ID = os.getenv("ADMIN_ID")
-TRC20_ADDRESS = "TGGZH5ZmNckTmuh3ZxLm3NoGUJ3yJifavP"
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
+TRC20_ADDRESS = os.getenv("TRC20_ADDRESS")
 
 bot = telebot.TeleBot(API_TOKEN)
 
-BONUS_MESSAGE = {
-    "tier1": "\n🎁 Bonus: You get a surprise gift for orders over 20 USDT!",
-    "tier2": "\n🎁 Bonus: You get a 15 USDT gift for orders over 50 USDT!",
-    "tier3": "\n🎁 Bonus: You get a 30 USDT gift for orders over 100 USDT!"
-}
-
+# Prekių sąrašas
 GAMES = {
-    "Free Fire": [
-        ("530 Diamonds", "4.50 USDT"),
-        ("1060 Diamonds", "9.00 USDT")
-    ],
-    "Mobile Legends": [
-        ("300 Diamonds", "4.00 USDT"),
-        ("1000 Diamonds", "8.50 USDT")
-    ],
-    "Roblox": [
-        ("800 Robux", "7.50 USDT"),
-        ("1700 Robux", "15.00 USDT")
-    ],
-    "CS:GO Skins": [
-        ("AWP | Asiimov", "29.00 USDT"),
-        ("AK-47 | Redline", "19.00 USDT"),
-        ("USP-S | Cortex", "9.00 USDT")
-    ],
-    "PUBG Mobile": [
-        ("690 UC", "5.50 USDT"),
-        ("1800 UC", "12.00 USDT")
-    ]
+    "Free Fire": [("530 Diamonds", 4.99), ("1060 Diamonds", 9.99)],
+    "Mobile Legends": [("300 Diamonds", 3.99), ("1000 Diamonds", 8.49)],
+    "Roblox": [("800 Robux", 7.49), ("1700 Robux", 14.99)],
+    "CS:GO Skins": [("AWP | Asiimov", 28.49), ("USP-S | Cortex", 8.99)],
+    "PUBG Mobile": [("690 UC", 5.49), ("1800 UC", 11.99)]
 }
 
+BONUSES = {
+    100: "🎁 Bonus: You get a 30.00 $ gift!",
+    50: "🎁 Bonus: You get a 10.00 $ gift!",
+    25: "🎁 Bonus: You get a 5.00 $ gift!"
+}
+
+user_cart = {}
+
+# Parinkimas žaidimo
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    for game in GAMES.keys():
+    for game in GAMES:
         markup.add(game)
-    bot.send_message(
-        message.chat.id,
-        """🎮 Welcome to LootBayBot!
+    markup.add("🛒 View Cart", "✅ Confirm Order")
+    bot.send_message(message.chat.id, "🎮 Choose a game:", reply_markup=markup)
 
-Choose your game below and get your top-up instantly using crypto 💰
+# Žaidimo prekių rodymas
+@bot.message_handler(func=lambda msg: msg.text in GAMES)
+def show_items(message):
+    game = message.text
+    markup = types.InlineKeyboardMarkup()
+    for name, price in GAMES[game]:
+        price_floor = math.floor(price)
+        markup.add(types.InlineKeyboardButton(
+            f"{name} - {price_floor}.00 $",
+            callback_data=f"select:{game}:{name}:{price_floor}"
+        ))
+    bot.send_message(message.chat.id, f"🛍 Choose quantity for {game}:", reply_markup=markup)
 
-🎁 *Bonus system:*
-• Orders over 20 USDT – Surprise gift
-• Orders over 50 USDT – 15 USDT gift
-• Orders over 100 USDT – 30 USDT gift
-
-👇 Select a game:""",
+# Kiekio pasirinkimas
+@bot.callback_query_handler(func=lambda c: c.data.startswith("select:"))
+def choose_quantity(call):
+    _, game, name, price = call.data.split(":")
+    markup = types.InlineKeyboardMarkup()
+    for qty in [1, 2, 3, 5]:
+        markup.add(types.InlineKeyboardButton(
+            f"{qty}x", callback_data=f"add:{game}:{name}:{price}:{qty}"
+        ))
+    bot.edit_message_text(
+        f"➕ How many *{name}*?",
+        call.message.chat.id,
+        call.message.message_id,
         reply_markup=markup,
         parse_mode="Markdown"
     )
-    print(f"[START] User: {message.from_user.id} started the bot")
 
-@bot.message_handler(func=lambda msg: msg.text in GAMES.keys())
-def game_selected(message):
-    game = message.text
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    for option, price in GAMES[game]:
-        markup.add(f"{game} | {option} | {price}")
-    bot.send_message(message.chat.id, f"💎 Choose top-up for {game}:", reply_markup=markup)
-    print(f"[SELECT] {message.from_user.id} selected {game}")
+# Pridėjimas į krepšelį
+@bot.callback_query_handler(func=lambda c: c.data.startswith("add:"))
+def add_to_cart(call):
+    _, game, name, price, qty = call.data.split(":")
+    price = int(price)
+    qty = int(qty)
+    user_id = call.from_user.id
 
-@bot.message_handler(func=lambda msg: any(g in msg.text for g in GAMES))
-def topup_selected(message):
-    try:
-        parts = message.text.split(" | ")
-        game, option, price_str = parts
-        price = float(price_str.replace("USDT", "").strip())
+    if user_id not in user_cart:
+        user_cart[user_id] = []
 
-        bonus_text = ""
-        if price >= 100:
-            bonus_text = BONUS_MESSAGE["tier3"]
-        elif price >= 50:
-            bonus_text = BONUS_MESSAGE["tier2"]
-        elif price >= 20:
-            bonus_text = BONUS_MESSAGE["tier1"]
+    user_cart[user_id].append({
+        "game": game,
+        "item": name,
+        "price": price,
+        "qty": qty
+    })
 
-        bot.send_message(
-            message.chat.id,
-            f"✅ You selected: {game} - {option} for {price_str}{bonus_text}\n\n"
-            f"💰 Please send *{price_str}* to:\n`{TRC20_ADDRESS}` (TRC20 USDT)\n\n"
-            "📸 Then send proof of payment to admin.",
-            parse_mode="Markdown"
-        )
-        print(f"[ORDER] {message.from_user.id} - {game} - {option} - {price_str}")
-    except Exception as e:
-        print(f"[ERROR] Parsing failed: {e}")
-        bot.send_message(message.chat.id, "⚠️ Invalid selection. Please start again with /start")
+    bot.send_message(call.message.chat.id, f"✅ Added {qty}x {name} to your cart.")
 
+# Krepšelio peržiūra
+@bot.message_handler(func=lambda msg: msg.text == "🛒 View Cart")
+def view_cart(message):
+    user_id = message.from_user.id
+    cart = user_cart.get(user_id, [])
+    if not cart:
+        bot.send_message(message.chat.id, "🛒 Your cart is empty.")
+        return
+
+    msg = "🧾 Your cart:\n"
+    total = 0
+    for item in cart:
+        line_total = item["price"] * item["qty"]
+        total += line_total
+        msg += f"- {item['qty']}x {item['item']} ({item['game']}) - {line_total}.00 $\n"
+
+    bonus = ""
+    for threshold, text in sorted(BONUSES.items(), reverse=True):
+        if total >= threshold:
+            bonus = text
+            break
+
+    msg += f"\n💰 Total: {total}.00 $\n{bonus}\n\n"
+    msg += "📸 Send proof of payment to confirm."
+
+    bot.send_message(message.chat.id, msg)
+
+# Užsakymo patvirtinimas
+@bot.message_handler(func=lambda msg: msg.text == "✅ Confirm Order")
+def confirm_order(message):
+    user_id = message.from_user.id
+    cart = user_cart.get(user_id, [])
+    if not cart:
+        bot.send_message(message.chat.id, "❗ Your cart is empty.")
+        return
+
+    total = sum(item["price"] * item["qty"] for item in cart)
+    msg = (
+        f"✅ Please send *{total}.00 $* in USDT (TRC20) to:\n"
+        f"`{TRC20_ADDRESS}`\n\n"
+        f"📸 Then send payment screenshot + list gift preference (if any) here."
+    )
+    bot.send_message(message.chat.id, msg, parse_mode="Markdown")
+
+# Mokėjimo įrodymas
 @bot.message_handler(content_types=['photo', 'text'])
-def forward_payment_proof(message):
-    if message.caption or message.text:
-        try:
-            bot.forward_message(int(ADMIN_ID), message.chat.id, message.message_id)
-            bot.send_message(message.chat.id, "✅ Proof sent to admin. We will verify and respond shortly.")
-            print(f"[PROOF] Forwarded from {message.from_user.id}")
-        except Exception as e:
-            print(f"[FORWARD ERROR] {e}")
-            bot.send_message(message.chat.id, "❌ Failed to forward message.")
+def handle_proof(message):
+    user_id = message.from_user.id
+    cart = user_cart.get(user_id, [])
+    if cart:
+        bot.forward_message(ADMIN_ID, message.chat.id, message.message_id)
+        bot.send_message(message.chat.id, "✅ Submitted. Admin will check shortly.")
+        user_cart[user_id] = []  # clear cart
     else:
-        bot.send_message(message.chat.id, "❗ Please send text or a photo with your Game ID and payment proof.")
+        bot.send_message(message.chat.id, "❗ No items in your cart. Use /start")
 
-# Start bot
-print("✅ Botas veikia. Laukia žinučių...")
+# Paleidimas
+print("✅ Bot is running...")
 bot.polling(none_stop=True)
